@@ -239,7 +239,7 @@ const Produtos = () => {
               
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="precoCompra">Preço de Compra (R$) *</Label>
+                  <Label htmlFor="precoCompra">Preço de Compra (Akz) *</Label>
                   <Input
                     id="precoCompra"
                     type="number"
@@ -251,7 +251,7 @@ const Produtos = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="precoVenda">Preço de Venda (R$) *</Label>
+                  <Label htmlFor="precoVenda">Preço de Venda (Akz) *</Label>
                   <Input
                     id="precoVenda"
                     type="number"
@@ -364,7 +364,7 @@ const Produtos = () => {
                     <TableCell>
                       <Badge variant="outline">{produto.categoria}</Badge>
                     </TableCell>
-                    <TableCell>R$ {produto.precoVenda.toFixed(2)}</TableCell>
+                    <TableCell>Akz {produto.precoVenda.toFixed(2)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span>{produto.estoque}</span>
