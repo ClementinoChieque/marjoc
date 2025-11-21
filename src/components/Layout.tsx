@@ -7,7 +7,8 @@ import {
   Package, 
   Menu,
   X,
-  Activity
+  Activity,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -30,6 +31,11 @@ const menuItems = [
     title: "Produtos",
     icon: Package,
     path: "/produtos",
+  },
+  {
+    title: "Relatórios",
+    icon: FileText,
+    path: "/relatorios",
   },
 ];
 
