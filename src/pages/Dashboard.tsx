@@ -26,7 +26,7 @@ const Dashboard = () => {
     },
     {
       title: "Valor em Estoque",
-      value: "R$ 3.847,50",
+      value: "Akz 3.847,50",
       icon: TrendingUp,
       description: "Valor total estimado",
       color: "text-success",
