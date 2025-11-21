@@ -25,9 +25,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Search, Edit, Trash2, AlertTriangle, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Produto {
   id: string;
@@ -39,6 +49,16 @@ interface Produto {
   estoqueMinimo: number;
   validade: string;
   codigo: string;
+}
+
+interface Venda {
+  id: string;
+  produtoId: string;
+  produtoNome: string;
+  quantidade: number;
+  precoVenda: number;
+  total: number;
+  data: string;
 }
 
 const categorias = [
@@ -90,9 +110,12 @@ const Produtos = () => {
     }
   ]);
   
+  const [vendas, setVendas] = useState<Venda[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
+  const [vendaProduto, setVendaProduto] = useState<Produto | null>(null);
+  const [quantidadeVenda, setQuantidadeVenda] = useState("");
   const [formData, setFormData] = useState({
     nome: "",
     categoria: "",
@@ -177,6 +200,44 @@ const Produtos = () => {
   };
 
   const isEstoqueBaixo = (produto: Produto) => produto.estoque <= produto.estoqueMinimo;
+
+  const handleVender = () => {
+    if (!vendaProduto || !quantidadeVenda) return;
+    
+    const quantidade = parseInt(quantidadeVenda);
+    
+    if (quantidade <= 0) {
+      toast.error("Quantidade inválida!");
+      return;
+    }
+    
+    if (quantidade > vendaProduto.estoque) {
+      toast.error("Estoque insuficiente!");
+      return;
+    }
+    
+    // Atualizar estoque do produto
+    setProdutos(produtos.map((p) =>
+      p.id === vendaProduto.id ? { ...p, estoque: p.estoque - quantidade } : p
+    ));
+    
+    // Registrar venda
+    const novaVenda: Venda = {
+      id: Date.now().toString(),
+      produtoId: vendaProduto.id,
+      produtoNome: vendaProduto.nome,
+      quantidade,
+      precoVenda: vendaProduto.precoVenda,
+      total: vendaProduto.precoVenda * quantidade,
+      data: new Date().toISOString(),
+    };
+    
+    setVendas([...vendas, novaVenda]);
+    
+    toast.success(`Venda de ${quantidade} unidade(s) registrada com sucesso!`);
+    setVendaProduto(null);
+    setQuantidadeVenda("");
+  };
 
   return (
     <div className="space-y-6">
@@ -381,6 +442,14 @@ const Produtos = () => {
                         <Button
                           variant="ghost"
                           size="icon"
+                          onClick={() => setVendaProduto(produto)}
+                          title="Vender"
+                        >
+                          <ShoppingCart className="h-4 w-4 text-primary" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleEdit(produto)}
                         >
                           <Edit className="h-4 w-4" />
@@ -401,6 +470,49 @@ const Produtos = () => {
           </Table>
         </div>
       </Card>
+
+      <AlertDialog open={!!vendaProduto} onOpenChange={(open) => !open && setVendaProduto(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Registrar Venda</AlertDialogTitle>
+            <AlertDialogDescription>
+              Produto: <strong>{vendaProduto?.nome}</strong>
+              <br />
+              Estoque disponível: <strong>{vendaProduto?.estoque}</strong> unidades
+              <br />
+              Preço unitário: <strong>Akz {vendaProduto?.precoVenda.toFixed(2)}</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 py-4">
+            <Label htmlFor="quantidadeVenda">Quantidade a vender *</Label>
+            <Input
+              id="quantidadeVenda"
+              type="number"
+              min="1"
+              max={vendaProduto?.estoque}
+              value={quantidadeVenda}
+              onChange={(e) => setQuantidadeVenda(e.target.value)}
+              placeholder="Informe a quantidade"
+            />
+            {quantidadeVenda && vendaProduto && (
+              <p className="text-sm text-muted-foreground">
+                Total: <strong>Akz {(parseFloat(quantidadeVenda) * vendaProduto.precoVenda).toFixed(2)}</strong>
+              </p>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setVendaProduto(null);
+              setQuantidadeVenda("");
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleVender}>
+              Confirmar Venda
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
