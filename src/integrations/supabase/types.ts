@@ -14,7 +14,125 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clientes: {
+        Row: {
+          created_at: string
+          documento: string
+          endereco: string
+          id: string
+          nome: string
+          observacoes: string | null
+          telefone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          documento: string
+          endereco: string
+          id?: string
+          nome: string
+          observacoes?: string | null
+          telefone: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          documento?: string
+          endereco?: string
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          telefone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      produtos: {
+        Row: {
+          categoria: string
+          created_at: string
+          estoque: number
+          id: string
+          nome: string
+          preco_custo: number
+          preco_venda: number
+          updated_at: string
+          user_id: string
+          validade: string | null
+        }
+        Insert: {
+          categoria: string
+          created_at?: string
+          estoque?: number
+          id?: string
+          nome: string
+          preco_custo: number
+          preco_venda: number
+          updated_at?: string
+          user_id: string
+          validade?: string | null
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          estoque?: number
+          id?: string
+          nome?: string
+          preco_custo?: number
+          preco_venda?: number
+          updated_at?: string
+          user_id?: string
+          validade?: string | null
+        }
+        Relationships: []
+      }
+      vendas: {
+        Row: {
+          created_at: string
+          data: string
+          id: string
+          preco_unitario: number
+          produto_id: string
+          produto_nome: string
+          quantidade: number
+          total: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: string
+          id?: string
+          preco_unitario: number
+          produto_id: string
+          produto_nome: string
+          quantidade: number
+          total: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          id?: string
+          preco_unitario?: number
+          produto_id?: string
+          produto_nome?: string
+          quantidade?: number
+          total?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendas_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

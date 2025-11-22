@@ -8,9 +8,11 @@ import {
   Menu,
   X,
   Activity,
-  FileText
+  FileText,
+  LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -42,6 +44,7 @@ const menuItems = [
 export function Layout({ children }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const location = useLocation();
+  const { signOut, user } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -84,8 +87,21 @@ export function Layout({ children }: LayoutProps) {
           </nav>
 
           {/* Footer */}
-          <div className="border-t border-sidebar-border px-6 py-4">
-            <p className="text-xs text-sidebar-foreground/60">
+          <div className="border-t border-sidebar-border px-3 py-4 space-y-3">
+            <div className="px-3">
+              <p className="text-xs text-sidebar-foreground/60 mb-1">Usuário:</p>
+              <p className="text-xs text-sidebar-foreground truncate">{user?.email}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={signOut}
+              className="w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Sair
+            </Button>
+            <p className="text-xs text-sidebar-foreground/60 px-3">
               Sistema de Gestão Farmacêutica
             </p>
           </div>
