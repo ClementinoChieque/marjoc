@@ -16,8 +16,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FileText, Download, TrendingUp, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { exportToPDF, exportToCSV } from "@/lib/exportUtils";
+import { toast } from "sonner";
+import logoUrl from "@/assets/marjoc-logo.png";
 
 interface Venda {
   id: string;
@@ -110,9 +119,37 @@ const Relatorios = () => {
     };
   }, [vendasFiltradas]);
 
-  const handleExportar = () => {
-    // Implementar exportação para PDF ou CSV
-    alert("Funcionalidade de exportação em desenvolvimento");
+  const handleExportarPDF = async () => {
+    try {
+      await exportToPDF(
+        vendasFiltradas,
+        produtos,
+        periodo,
+        resumo.totalVendas,
+        resumo.totalReceita,
+        logoUrl
+      );
+      toast.success("Relatório PDF exportado com sucesso!");
+    } catch (error) {
+      toast.error("Erro ao exportar relatório PDF");
+      console.error(error);
+    }
+  };
+
+  const handleExportarCSV = () => {
+    try {
+      exportToCSV(
+        vendasFiltradas,
+        produtos,
+        periodo,
+        resumo.totalVendas,
+        resumo.totalReceita
+      );
+      toast.success("Relatório CSV exportado com sucesso!");
+    } catch (error) {
+      toast.error("Erro ao exportar relatório CSV");
+      console.error(error);
+    }
   };
 
   return (
@@ -135,10 +172,22 @@ const Relatorios = () => {
               <SelectItem value="mensal">Mensal</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" className="gap-2" onClick={handleExportar}>
-            <Download className="h-4 w-4" />
-            Exportar
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Download className="h-4 w-4" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={handleExportarPDF}>
+                Exportar como PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportarCSV}>
+                Exportar como CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
