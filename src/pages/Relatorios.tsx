@@ -27,6 +27,21 @@ import { Badge } from "@/components/ui/badge";
 import { exportToPDF, exportToCSV } from "@/lib/exportUtils";
 import { toast } from "sonner";
 import logoUrl from "@/assets/marjoc-logo.png";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 interface Venda {
   id: string;
@@ -100,15 +115,17 @@ const Relatorios = () => {
       const existente = acc.find((p) => p.produtoId === v.produtoId);
       if (existente) {
         existente.quantidade += v.quantidade;
+        existente.receita += v.total;
       } else {
         acc.push({
           produtoId: v.produtoId,
           produtoNome: v.produtoNome,
           quantidade: v.quantidade,
+          receita: v.total,
         });
       }
       return acc;
-    }, [] as { produtoId: string; produtoNome: string; quantidade: number }[]);
+    }, [] as { produtoId: string; produtoNome: string; quantidade: number; receita: number }[]);
 
     produtosMaisVendidos.sort((a, b) => b.quantidade - a.quantidade);
 
@@ -118,6 +135,39 @@ const Relatorios = () => {
       produtosMaisVendidos: produtosMaisVendidos.slice(0, 5),
     };
   }, [vendasFiltradas]);
+
+  // Dados para gráfico de linha (vendas ao longo do tempo)
+  const dadosVendasTempo = useMemo(() => {
+    const vendasPorData = vendasFiltradas.reduce((acc, v) => {
+      const data = new Date(v.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const existente = acc.find((item) => item.data === data);
+      if (existente) {
+        existente.vendas += v.quantidade;
+        existente.receita += v.total;
+      } else {
+        acc.push({ data, vendas: v.quantidade, receita: v.total });
+      }
+      return acc;
+    }, [] as { data: string; vendas: number; receita: number }[]);
+
+    return vendasPorData.sort((a, b) => {
+      const [diaA, mesA] = a.data.split('/').map(Number);
+      const [diaB, mesB] = b.data.split('/').map(Number);
+      return mesA === mesB ? diaA - diaB : mesA - mesB;
+    });
+  }, [vendasFiltradas]);
+
+  // Dados para gráfico de barras (produtos mais vendidos)
+  const dadosProdutos = useMemo(() => {
+    return resumo.produtosMaisVendidos.map(p => ({
+      nome: p.produtoNome.length > 15 ? p.produtoNome.substring(0, 15) + '...' : p.produtoNome,
+      quantidade: p.quantidade,
+      receita: p.receita,
+    }));
+  }, [resumo.produtosMaisVendidos]);
+
+  // Cores para os gráficos
+  const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', 'hsl(var(--accent))'];
 
   const handleExportarPDF = async () => {
     try {
@@ -232,9 +282,90 @@ const Relatorios = () => {
         </Card>
       </div>
 
+      {vendasFiltradas.length > 0 && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card className="p-6">
+            <h3 className="mb-4 text-lg font-semibold">Evolução de Vendas</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={dadosVendasTempo}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="data" 
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '12px' }}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="vendas" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={2}
+                  name="Quantidade"
+                  dot={{ fill: 'hsl(var(--primary))' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="receita" 
+                  stroke="hsl(var(--success))" 
+                  strokeWidth={2}
+                  name="Receita (Akz)"
+                  dot={{ fill: 'hsl(var(--success))' }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <Card className="p-6">
+            <h3 className="mb-4 text-lg font-semibold">Produtos Mais Vendidos</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={dadosProdutos}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="nome" 
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '11px' }}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend />
+                <Bar 
+                  dataKey="quantidade" 
+                  fill="hsl(var(--primary))"
+                  name="Quantidade"
+                  radius={[8, 8, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="p-6">
-          <h3 className="mb-4 text-lg font-semibold">Produtos Mais Vendidos</h3>
+          <h3 className="mb-4 text-lg font-semibold">Top 5 Produtos</h3>
           <div className="space-y-3">
             {resumo.produtosMaisVendidos.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
