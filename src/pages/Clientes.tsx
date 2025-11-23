@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -21,8 +21,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface Cliente {
   id: string;
@@ -34,9 +32,24 @@ interface Cliente {
 }
 
 const Clientes = () => {
-  const { user } = useAuth();
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [clientes, setClientes] = useState<Cliente[]>([
+    {
+      id: "1",
+      nome: "Maria Silva Santos",
+      telefone: "(11) 98765-4321",
+      endereco: "Rua das Flores, 123 - São Paulo, SP",
+      documento: "123.456.789-00",
+      observacoes: "Cliente preferencial"
+    },
+    {
+      id: "2",
+      nome: "João Pedro Oliveira",
+      telefone: "(11) 91234-5678",
+      endereco: "Av. Paulista, 1000 - São Paulo, SP",
+      documento: "987.654.321-00",
+    }
+  ]);
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
@@ -48,77 +61,27 @@ const Clientes = () => {
     observacoes: "",
   });
 
-  useEffect(() => {
-    fetchClientes();
-  }, [user]);
-
-  const fetchClientes = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('clientes')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast.error("Erro ao carregar clientes");
-      console.error(error);
-    } else {
-      setClientes(data || []);
-    }
-    setLoading(false);
-  };
-
   const filteredClientes = clientes.filter((cliente) =>
     cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
     cliente.telefone.includes(searchTerm) ||
     cliente.documento.includes(searchTerm)
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user) return;
-
     if (editingCliente) {
-      const { error } = await supabase
-        .from('clientes')
-        .update({
-          nome: formData.nome,
-          telefone: formData.telefone,
-          endereco: formData.endereco,
-          documento: formData.documento,
-          observacoes: formData.observacoes || null,
-        })
-        .eq('id', editingCliente.id);
-
-      if (error) {
-        toast.error("Erro ao atualizar cliente");
-        console.error(error);
-      } else {
-        toast.success("Cliente atualizado com sucesso!");
-        fetchClientes();
-      }
+      setClientes(clientes.map((c) =>
+        c.id === editingCliente.id ? { ...formData, id: c.id } : c
+      ));
+      toast.success("Cliente atualizado com sucesso!");
     } else {
-      const { error } = await supabase
-        .from('clientes')
-        .insert({
-          user_id: user.id,
-          nome: formData.nome,
-          telefone: formData.telefone,
-          endereco: formData.endereco,
-          documento: formData.documento,
-          observacoes: formData.observacoes || null,
-        });
-
-      if (error) {
-        toast.error("Erro ao cadastrar cliente");
-        console.error(error);
-      } else {
-        toast.success("Cliente cadastrado com sucesso!");
-        fetchClientes();
-      }
+      const novoCliente = {
+        ...formData,
+        id: Date.now().toString(),
+      };
+      setClientes([...clientes, novoCliente]);
+      toast.success("Cliente cadastrado com sucesso!");
     }
     
     resetForm();
@@ -127,28 +90,15 @@ const Clientes = () => {
   const handleEdit = (cliente: Cliente) => {
     setEditingCliente(cliente);
     setFormData({
-      nome: cliente.nome,
-      telefone: cliente.telefone,
-      endereco: cliente.endereco,
-      documento: cliente.documento,
+      ...cliente,
       observacoes: cliente.observacoes || "",
     });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase
-      .from('clientes')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      toast.error("Erro ao excluir cliente");
-      console.error(error);
-    } else {
-      toast.success("Cliente excluído com sucesso!");
-      fetchClientes();
-    }
+  const handleDelete = (id: string) => {
+    setClientes(clientes.filter((c) => c.id !== id));
+    toast.success("Cliente excluído com sucesso!");
   };
 
   const resetForm = () => {
@@ -162,17 +112,6 @@ const Clientes = () => {
     setEditingCliente(null);
     setIsDialogOpen(false);
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando clientes...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">

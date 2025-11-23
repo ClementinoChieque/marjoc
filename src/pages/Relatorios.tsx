@@ -1,17 +1,40 @@
-import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState, useMemo } from "react";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { FileText, Download, TrendingUp, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Download, Package, TrendingUp, ShoppingCart } from "lucide-react";
 import { exportToPDF, exportToCSV } from "@/lib/exportUtils";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+import logoUrl from "@/assets/marjoc-logo.png";
 import {
   LineChart,
   Line,
   BarChart,
   Bar,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -19,177 +42,186 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import logoUrl from "@/assets/marjoc-logo.png";
 
 interface Venda {
   id: string;
-  produto_nome: string;
+  produtoId: string;
+  produtoNome: string;
   quantidade: number;
-  preco_unitario: number;
+  precoVenda: number;
   total: number;
   data: string;
 }
 
-interface Produto {
-  id: string;
-  nome: string;
-  estoque: number;
-  preco_venda: number;
-}
-
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', 'hsl(var(--success))', 'hsl(var(--warning))'];
-
 const Relatorios = () => {
-  const { user } = useAuth();
-  const [vendas, setVendas] = useState<Venda[]>([]);
-  const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [periodo, setPeriodo] = useState<'semanal' | 'mensal'>('mensal');
+  const [periodo, setPeriodo] = useState<"semanal" | "mensal">("mensal");
 
-  useEffect(() => {
-    fetchData();
-  }, [user]);
+  // Dados de exemplo - em produção viriam do estado global ou backend
+  const vendas: Venda[] = [
+    {
+      id: "1",
+      produtoId: "1",
+      produtoNome: "Dipirona 500mg",
+      quantidade: 25,
+      precoVenda: 12.90,
+      total: 322.50,
+      data: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "2",
+      produtoId: "2",
+      produtoNome: "Ibuprofeno 600mg",
+      quantidade: 10,
+      precoVenda: 18.50,
+      total: 185.00,
+      data: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "3",
+      produtoId: "3",
+      produtoNome: "Vitamina C 1g",
+      quantidade: 15,
+      precoVenda: 32.90,
+      total: 493.50,
+      data: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  ];
 
-  const fetchData = async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    
-    const [vendasResult, produtosResult] = await Promise.all([
-      supabase.from('vendas').select('*').order('data', { ascending: false }),
-      supabase.from('produtos').select('id, nome, estoque, preco_venda')
-    ]);
+  const produtos = [
+    { id: "1", nome: "Dipirona 500mg", estoque: 125 },
+    { id: "2", nome: "Ibuprofeno 600mg", estoque: 15 },
+    { id: "3", nome: "Vitamina C 1g", estoque: 65 },
+  ];
 
-    if (vendasResult.data) setVendas(vendasResult.data);
-    if (produtosResult.data) setProdutos(produtosResult.data);
-    
-    setLoading(false);
-  };
+  const filtrarPorPeriodo = (venda: Venda) => {
+    const dataVenda = new Date(venda.data);
+    const agora = new Date();
+    const diferenca = agora.getTime() - dataVenda.getTime();
+    const dias = diferenca / (1000 * 60 * 60 * 24);
 
-  const filtrarPorPeriodo = (vendas: Venda[]) => {
-    const dataLimite = new Date();
-    if (periodo === 'semanal') {
-      dataLimite.setDate(dataLimite.getDate() - 7);
+    if (periodo === "semanal") {
+      return dias <= 7;
     } else {
-      dataLimite.setDate(dataLimite.getDate() - 30);
+      return dias <= 30;
     }
-    
-    return vendas.filter((v) => new Date(v.data) >= dataLimite);
   };
 
-  const vendasFiltradas = filtrarPorPeriodo(vendas);
+  const vendasFiltradas = vendas.filter(filtrarPorPeriodo);
 
   const resumo = useMemo(() => {
-    const totalVendas = vendasFiltradas.length;
-    const receitaTotal = vendasFiltradas.reduce((sum, v) => sum + v.total, 0);
-    const estoqueTotal = produtos.reduce((sum, p) => sum + p.estoque, 0);
-
-    const produtosMaisVendidos = vendasFiltradas.reduce((acc, venda) => {
-      if (!acc[venda.produto_nome]) {
-        acc[venda.produto_nome] = { quantidade: 0, receita: 0 };
+    const totalVendas = vendasFiltradas.reduce((acc, v) => acc + v.quantidade, 0);
+    const totalReceita = vendasFiltradas.reduce((acc, v) => acc + v.total, 0);
+    const produtosMaisVendidos = vendasFiltradas.reduce((acc, v) => {
+      const existente = acc.find((p) => p.produtoId === v.produtoId);
+      if (existente) {
+        existente.quantidade += v.quantidade;
+        existente.receita += v.total;
+      } else {
+        acc.push({
+          produtoId: v.produtoId,
+          produtoNome: v.produtoNome,
+          quantidade: v.quantidade,
+          receita: v.total,
+        });
       }
-      acc[venda.produto_nome].quantidade += venda.quantidade;
-      acc[venda.produto_nome].receita += venda.total;
       return acc;
-    }, {} as Record<string, { quantidade: number; receita: number }>);
+    }, [] as { produtoId: string; produtoNome: string; quantidade: number; receita: number }[]);
+
+    produtosMaisVendidos.sort((a, b) => b.quantidade - a.quantidade);
 
     return {
       totalVendas,
-      receitaTotal,
-      estoqueTotal,
-      produtosMaisVendidos,
+      totalReceita,
+      produtosMaisVendidos: produtosMaisVendidos.slice(0, 5),
     };
-  }, [vendasFiltradas, produtos]);
-
-  const dadosVendasTempo = useMemo(() => {
-    const agrupado = vendasFiltradas.reduce((acc, venda) => {
-      const data = new Date(venda.data).toLocaleDateString('pt-BR');
-      if (!acc[data]) {
-        acc[data] = { data, vendas: 0, receita: 0 };
-      }
-      acc[data].vendas += venda.quantidade;
-      acc[data].receita += venda.total;
-      return acc;
-    }, {} as Record<string, { data: string; vendas: number; receita: number }>);
-
-    return Object.values(agrupado).sort((a, b) => 
-      new Date(a.data.split('/').reverse().join('-')).getTime() - 
-      new Date(b.data.split('/').reverse().join('-')).getTime()
-    );
   }, [vendasFiltradas]);
 
+  // Dados para gráfico de linha (vendas ao longo do tempo)
+  const dadosVendasTempo = useMemo(() => {
+    const vendasPorData = vendasFiltradas.reduce((acc, v) => {
+      const data = new Date(v.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const existente = acc.find((item) => item.data === data);
+      if (existente) {
+        existente.vendas += v.quantidade;
+        existente.receita += v.total;
+      } else {
+        acc.push({ data, vendas: v.quantidade, receita: v.total });
+      }
+      return acc;
+    }, [] as { data: string; vendas: number; receita: number }[]);
+
+    return vendasPorData.sort((a, b) => {
+      const [diaA, mesA] = a.data.split('/').map(Number);
+      const [diaB, mesB] = b.data.split('/').map(Number);
+      return mesA === mesB ? diaA - diaB : mesA - mesB;
+    });
+  }, [vendasFiltradas]);
+
+  // Dados para gráfico de barras (produtos mais vendidos)
   const dadosProdutos = useMemo(() => {
-    return Object.entries(resumo.produtosMaisVendidos)
-      .map(([nome, dados]) => ({
-        nome,
-        quantidade: dados.quantidade,
-        receita: dados.receita,
-      }))
-      .sort((a, b) => b.quantidade - a.quantidade)
-      .slice(0, 5);
+    return resumo.produtosMaisVendidos.map(p => ({
+      nome: p.produtoNome.length > 15 ? p.produtoNome.substring(0, 15) + '...' : p.produtoNome,
+      quantidade: p.quantidade,
+      receita: p.receita,
+    }));
   }, [resumo.produtosMaisVendidos]);
 
-  const handleExportarPDF = () => {
-    const vendasParaExport = vendasFiltradas.map(v => ({
-      id: v.id,
-      produtoId: v.id,
-      produtoNome: v.produto_nome,
-      quantidade: v.quantidade,
-      precoVenda: v.preco_unitario,
-      total: v.total,
-      data: v.data
-    }));
-    exportToPDF(vendasParaExport, produtos, periodo, resumo.totalVendas, resumo.receitaTotal, logoUrl);
+  // Cores para os gráficos
+  const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', 'hsl(var(--accent))'];
+
+  const handleExportarPDF = async () => {
+    try {
+      await exportToPDF(
+        vendasFiltradas,
+        produtos,
+        periodo,
+        resumo.totalVendas,
+        resumo.totalReceita,
+        logoUrl
+      );
+      toast.success("Relatório PDF exportado com sucesso!");
+    } catch (error) {
+      toast.error("Erro ao exportar relatório PDF");
+      console.error(error);
+    }
   };
 
   const handleExportarCSV = () => {
-    const vendasParaExport = vendasFiltradas.map(v => ({
-      id: v.id,
-      produtoId: v.id,
-      produtoNome: v.produto_nome,
-      quantidade: v.quantidade,
-      precoVenda: v.preco_unitario,
-      total: v.total,
-      data: v.data
-    }));
-    exportToCSV(vendasParaExport, produtos, periodo, resumo.totalVendas, resumo.receitaTotal);
+    try {
+      exportToCSV(
+        vendasFiltradas,
+        produtos,
+        periodo,
+        resumo.totalVendas,
+        resumo.totalReceita
+      );
+      toast.success("Relatório CSV exportado com sucesso!");
+    } catch (error) {
+      toast.error("Erro ao exportar relatório CSV");
+      console.error(error);
+    }
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando relatórios...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Relatórios e Análises</h2>
+          <h2 className="text-2xl font-bold text-foreground">Relatórios</h2>
           <p className="text-sm text-muted-foreground">
-            Visualize o desempenho de vendas e estoque
+            Visualize vendas e estoque por período
           </p>
         </div>
-        
+
         <div className="flex gap-2">
-          <Select value={periodo} onValueChange={(value: 'semanal' | 'mensal') => setPeriodo(value)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Período" />
+          <Select value={periodo} onValueChange={(value: "semanal" | "mensal") => setPeriodo(value)}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="semanal">Última Semana</SelectItem>
-              <SelectItem value="mensal">Último Mês</SelectItem>
+              <SelectItem value="semanal">Semanal</SelectItem>
+              <SelectItem value="mensal">Mensal</SelectItem>
             </SelectContent>
           </Select>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
@@ -199,189 +231,228 @@ const Relatorios = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={handleExportarPDF}>
-                Exportar PDF
+                Exportar como PDF
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportarCSV}>
-                Exportar CSV
+                Exportar como CSV
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
-      {/* Resumo */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Vendas</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{resumo.totalVendas}</div>
-            <p className="text-xs text-muted-foreground">
-              {periodo === 'semanal' ? 'últimos 7 dias' : 'últimos 30 dias'}
-            </p>
-          </CardContent>
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full bg-primary/10 p-3">
+              <FileText className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Total de Vendas</p>
+              <p className="text-2xl font-bold">{resumo.totalVendas}</p>
+              <p className="text-xs text-muted-foreground">unidades vendidas</p>
+            </div>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">Akz {resumo.receitaTotal.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              {periodo === 'semanal' ? 'últimos 7 dias' : 'últimos 30 dias'}
-            </p>
-          </CardContent>
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full bg-success/10 p-3">
+              <TrendingUp className="h-6 w-6 text-success" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Receita Total</p>
+              <p className="text-2xl font-bold">Akz {resumo.totalReceita.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">no período</p>
+            </div>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estoque Total</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{resumo.estoqueTotal}</div>
-            <p className="text-xs text-muted-foreground">unidades disponíveis</p>
-          </CardContent>
+        <Card className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full bg-warning/10 p-3">
+              <Package className="h-6 w-6 text-warning" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Produtos em Estoque</p>
+              <p className="text-2xl font-bold">{produtos.reduce((acc, p) => acc + p.estoque, 0)}</p>
+              <p className="text-xs text-muted-foreground">unidades totais</p>
+            </div>
+          </div>
         </Card>
       </div>
 
-      {/* Gráficos */}
-      {dadosVendasTempo.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Evolução de Vendas</CardTitle>
-              <CardDescription>Vendas e receita ao longo do tempo</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={dadosVendasTempo}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="data" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
-                  <Legend />
-                  <Line 
-                    yAxisId="left" 
-                    type="monotone" 
-                    dataKey="vendas" 
-                    stroke="hsl(var(--primary))" 
-                    name="Vendas (un)" 
-                  />
-                  <Line 
-                    yAxisId="right" 
-                    type="monotone" 
-                    dataKey="receita" 
-                    stroke="hsl(var(--accent))" 
-                    name="Receita (Akz)" 
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
+      {vendasFiltradas.length > 0 && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card className="p-6">
+            <h3 className="mb-4 text-lg font-semibold">Evolução de Vendas</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={dadosVendasTempo}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="data" 
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '12px' }}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="vendas" 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={2}
+                  name="Quantidade"
+                  dot={{ fill: 'hsl(var(--primary))' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="receita" 
+                  stroke="hsl(var(--success))" 
+                  strokeWidth={2}
+                  name="Receita (Akz)"
+                  dot={{ fill: 'hsl(var(--success))' }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Produtos Mais Vendidos</CardTitle>
-              <CardDescription>Top 5 produtos por quantidade</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={dadosProdutos}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="nome" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="quantidade" fill="hsl(var(--primary))" name="Quantidade" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
+          <Card className="p-6">
+            <h3 className="mb-4 text-lg font-semibold">Produtos Mais Vendidos</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={dadosProdutos}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  dataKey="nome" 
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '11px' }}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--background))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend />
+                <Bar 
+                  dataKey="quantidade" 
+                  fill="hsl(var(--primary))"
+                  name="Quantidade"
+                  radius={[8, 8, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
           </Card>
         </div>
       )}
 
-      {/* Tabelas */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Top 5 Produtos</CardTitle>
-            <CardDescription>Produtos mais vendidos no período</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="p-6">
+          <h3 className="mb-4 text-lg font-semibold">Top 5 Produtos</h3>
+          <div className="space-y-3">
+            {resumo.produtosMaisVendidos.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma venda registrada no período
+              </p>
+            ) : (
+              resumo.produtosMaisVendidos.map((produto, index) => (
+                <div key={produto.produtoId} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="secondary" className="w-8 h-8 rounded-full flex items-center justify-center">
+                      {index + 1}
+                    </Badge>
+                    <div>
+                      <p className="font-medium">{produto.produtoNome}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {produto.quantidade} unidades vendidas
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <h3 className="mb-4 text-lg font-semibold">Estoque Atual</h3>
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Produto</TableHead>
                   <TableHead className="text-right">Quantidade</TableHead>
-                  <TableHead className="text-right">Receita</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dadosProdutos.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground">
-                      Nenhuma venda registrada no período
-                    </TableCell>
+                {produtos.map((produto) => (
+                  <TableRow key={produto.id}>
+                    <TableCell className="font-medium">{produto.nome}</TableCell>
+                    <TableCell className="text-right">{produto.estoque}</TableCell>
                   </TableRow>
-                ) : (
-                  dadosProdutos.map((produto, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{produto.nome}</TableCell>
-                      <TableCell className="text-right">{produto.quantidade}</TableCell>
-                      <TableCell className="text-right">Akz {produto.receita.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Vendas Recentes</CardTitle>
-            <CardDescription>Últimas vendas registradas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Produto</TableHead>
-                  <TableHead className="text-right">Qtd</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Data</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {vendasFiltradas.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      Nenhuma venda registrada no período
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  vendasFiltradas.slice(0, 10).map((venda) => (
-                    <TableRow key={venda.id}>
-                      <TableCell className="font-medium">{venda.produto_nome}</TableCell>
-                      <TableCell className="text-right">{venda.quantidade}</TableCell>
-                      <TableCell className="text-right">Akz {venda.total.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">
-                        {new Date(venda.data).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
+          </div>
         </Card>
       </div>
+
+      <Card className="p-6">
+        <h3 className="mb-4 text-lg font-semibold">Histórico de Vendas</h3>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Produto</TableHead>
+                <TableHead>Quantidade</TableHead>
+                <TableHead>Preço Unit.</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {vendasFiltradas.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    Nenhuma venda registrada no período
+                  </TableCell>
+                </TableRow>
+              ) : (
+                vendasFiltradas.map((venda) => (
+                  <TableRow key={venda.id}>
+                    <TableCell>
+                      {new Date(venda.data).toLocaleDateString('pt-BR')}
+                    </TableCell>
+                    <TableCell className="font-medium">{venda.produtoNome}</TableCell>
+                    <TableCell>{venda.quantidade}</TableCell>
+                    <TableCell>Akz {venda.precoVenda.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      Akz {venda.total.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
     </div>
   );
 };

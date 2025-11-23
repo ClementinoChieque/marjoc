@@ -8,12 +8,9 @@ import {
   Menu,
   X,
   Activity,
-  FileText,
-  LogOut,
-  UserCog
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -24,43 +21,27 @@ const menuItems = [
     title: "Dashboard",
     icon: LayoutDashboard,
     path: "/",
-    roles: ['administrador', 'farmaceutico', 'operador_caixa']
   },
   {
     title: "Clientes",
     icon: Users,
     path: "/clientes",
-    roles: ['administrador', 'farmaceutico', 'operador_caixa']
   },
   {
     title: "Produtos",
     icon: Package,
     path: "/produtos",
-    roles: ['administrador', 'farmaceutico']
   },
   {
     title: "Relatórios",
     icon: FileText,
     path: "/relatorios",
-    roles: ['administrador']
-  },
-  {
-    title: "Usuários",
-    icon: UserCog,
-    path: "/usuarios",
-    roles: ['administrador']
   },
 ];
 
 export function Layout({ children }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const location = useLocation();
-  const { signOut, profile, userRole } = useAuth();
-
-  // Filter menu items based on user role
-  const filteredMenuItems = menuItems.filter(item => 
-    !userRole || item.roles.includes(userRole)
-  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -80,7 +61,7 @@ export function Layout({ children }: LayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 px-3 py-4">
-            {filteredMenuItems.map((item) => {
+            {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
               
@@ -103,26 +84,8 @@ export function Layout({ children }: LayoutProps) {
           </nav>
 
           {/* Footer */}
-          <div className="border-t border-sidebar-border px-3 py-4 space-y-3">
-            <div className="px-3">
-              <p className="text-xs text-sidebar-foreground/60 mb-1">Usuário:</p>
-              <p className="text-xs text-sidebar-foreground font-medium truncate">
-                {profile?.nome_completo || 'Carregando...'}
-              </p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">
-                @{profile?.username || '...'}
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={signOut}
-              className="w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Sair
-            </Button>
-            <p className="text-xs text-sidebar-foreground/60 px-3">
+          <div className="border-t border-sidebar-border px-6 py-4">
+            <p className="text-xs text-sidebar-foreground/60">
               Sistema de Gestão Farmacêutica
             </p>
           </div>
@@ -152,7 +115,7 @@ export function Layout({ children }: LayoutProps) {
               )}
             </Button>
             <h1 className="text-lg font-semibold text-foreground">
-              {filteredMenuItems.find((item) => item.path === location.pathname)?.title || "Dashboard"}
+              {menuItems.find((item) => item.path === location.pathname)?.title || "Dashboard"}
             </h1>
           </div>
         </header>
