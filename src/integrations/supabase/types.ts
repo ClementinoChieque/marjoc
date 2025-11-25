@@ -14,16 +14,190 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clientes: {
+        Row: {
+          created_at: string
+          documento: string
+          endereco: string
+          id: string
+          nome: string
+          observacoes: string | null
+          telefone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          documento: string
+          endereco: string
+          id?: string
+          nome: string
+          observacoes?: string | null
+          telefone: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          documento?: string
+          endereco?: string
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          telefone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      produtos: {
+        Row: {
+          categoria: string
+          created_at: string
+          estoque: number
+          id: string
+          nome: string
+          preco_custo: number
+          preco_venda: number
+          updated_at: string
+          user_id: string
+          validade: string | null
+        }
+        Insert: {
+          categoria: string
+          created_at?: string
+          estoque?: number
+          id?: string
+          nome: string
+          preco_custo: number
+          preco_venda: number
+          updated_at?: string
+          user_id: string
+          validade?: string | null
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          estoque?: number
+          id?: string
+          nome?: string
+          preco_custo?: number
+          preco_venda?: number
+          updated_at?: string
+          user_id?: string
+          validade?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          nome_completo: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          nome_completo: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome_completo?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      vendas: {
+        Row: {
+          created_at: string
+          data: string
+          id: string
+          preco_unitario: number
+          produto_id: string
+          produto_nome: string
+          quantidade: number
+          total: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: string
+          id?: string
+          preco_unitario: number
+          produto_id: string
+          produto_nome: string
+          quantidade: number
+          total: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          id?: string
+          preco_unitario?: number
+          produto_id?: string
+          produto_nome?: string
+          quantidade?: number
+          total?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendas_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_first_user: { Args: never; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "administrador" | "farmaceutico" | "operador_caixa"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +324,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["administrador", "farmaceutico", "operador_caixa"],
+    },
   },
 } as const
