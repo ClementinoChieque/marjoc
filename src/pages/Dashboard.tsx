@@ -1,32 +1,76 @@
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Users, Package, TrendingUp, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Dashboard = () => {
-  const stats = [
+  const [stats, setStats] = useState({
+    totalClientes: 0,
+    totalProdutos: 0,
+    produtosEmFalta: 0,
+    valorEstoque: 0,
+  });
+  const [produtosBaixoEstoque, setProdutosBaixoEstoque] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      // Total de clientes
+      const { count: clientesCount } = await supabase
+        .from("clientes")
+        .select("*", { count: "exact", head: true });
+
+      // Total de produtos e estoque
+      const { data: produtos } = await supabase
+        .from("produtos")
+        .select("*");
+
+      const totalProdutos = produtos?.length || 0;
+      const produtosEmFalta = produtos?.filter(p => p.estoque < 30).length || 0;
+      const valorEstoque = produtos?.reduce((acc, p) => acc + (p.preco_venda * p.estoque), 0) || 0;
+
+      setStats({
+        totalClientes: clientesCount || 0,
+        totalProdutos,
+        produtosEmFalta,
+        valorEstoque,
+      });
+
+      setProdutosBaixoEstoque(produtos?.filter(p => p.estoque < 30) || []);
+    } catch (error: any) {
+      toast.error("Erro ao carregar estatísticas: " + error.message);
+    }
+  };
+
+  const statsCards = [
     {
       title: "Total de Clientes",
-      value: "2",
+      value: stats.totalClientes.toString(),
       icon: Users,
       description: "Clientes cadastrados",
       color: "text-primary",
     },
     {
       title: "Total de Produtos",
-      value: "3",
+      value: stats.totalProdutos.toString(),
       icon: Package,
       description: "Produtos no sistema",
       color: "text-primary",
     },
     {
       title: "Produtos em Falta",
-      value: "1",
+      value: stats.produtosEmFalta.toString(),
       icon: AlertTriangle,
       description: "Estoque abaixo do mínimo",
       color: "text-warning",
     },
     {
       title: "Valor em Estoque",
-      value: "Akz 3.847,50",
+      value: `Akz ${stats.valorEstoque.toFixed(2)}`,
       icon: TrendingUp,
       description: "Valor total estimado",
       color: "text-success",
@@ -43,7 +87,7 @@ const Dashboard = () => {
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
+        {statsCards.map((stat) => {
           const Icon = stat.icon;
           return (
             <Card key={stat.title} className="p-6">
@@ -74,35 +118,39 @@ const Dashboard = () => {
             Alertas de Estoque
           </h3>
           <div className="space-y-3">
-            <div className="flex items-center gap-3 rounded-lg border border-warning/20 bg-warning/5 p-3">
-              <AlertTriangle className="h-5 w-5 text-warning" />
-              <div className="flex-1">
-                <p className="font-medium text-foreground">Ibuprofeno 600mg</p>
-                <p className="text-sm text-muted-foreground">
-                  Estoque: 25 unidades (mínimo: 30)
-                </p>
-              </div>
-            </div>
+            {produtosBaixoEstoque.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nenhum alerta de estoque
+              </p>
+            ) : (
+              produtosBaixoEstoque.map((produto) => (
+                <div
+                  key={produto.id}
+                  className="flex items-center gap-3 rounded-lg border border-warning/20 bg-warning/5 p-3"
+                >
+                  <AlertTriangle className="h-5 w-5 text-warning" />
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">{produto.nome}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Estoque: {produto.estoque} unidades (mínimo: 30)
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </Card>
 
         <Card className="p-6">
           <h3 className="mb-4 text-lg font-semibold text-foreground">
-            Ações Rápidas
+            Informação do Sistema
           </h3>
-          <div className="space-y-2">
-            <button className="w-full rounded-lg border border-border p-3 text-left transition-colors hover:bg-secondary">
-              <p className="font-medium text-foreground">Registrar Nova Venda</p>
-              <p className="text-sm text-muted-foreground">
-                Adicionar uma nova transação
-              </p>
-            </button>
-            <button className="w-full rounded-lg border border-border p-3 text-left transition-colors hover:bg-secondary">
-              <p className="font-medium text-foreground">Entrada de Produtos</p>
-              <p className="text-sm text-muted-foreground">
-                Registrar nova compra de estoque
-              </p>
-            </button>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>Sistema de Gestão Farmacêutica Marjoc</p>
+            <p>Gerencie clientes, produtos e vendas de forma eficiente</p>
+            <p className="mt-4 font-medium text-foreground">
+              Use o menu lateral para navegar entre as seções
+            </p>
           </div>
         </Card>
       </div>
