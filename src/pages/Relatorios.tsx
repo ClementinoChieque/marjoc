@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +26,7 @@ import { FileText, Download, TrendingUp, Package } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { exportToPDF, exportToCSV } from "@/lib/exportUtils";
 import { toast } from "sonner";
-import logoUrl from "@/assets/marjoc-logo.png";
+import marjocLogo from "@/assets/marjoc-logo.jpg";
 import {
   LineChart,
   Line,
@@ -42,178 +42,158 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { supabase } from "@/integrations/supabase/client";
 
-interface Venda {
-  id: string;
-  produtoId: string;
-  produtoNome: string;
-  quantidade: number;
-  precoVenda: number;
-  total: number;
-  data: string;
-}
+const COLORS = ["#14b8a6", "#06b6d4", "#8b5cf6", "#f59e0b", "#ef4444"];
 
 const Relatorios = () => {
-  const [periodo, setPeriodo] = useState<"semanal" | "mensal">("mensal");
+  const [periodo, setPeriodo] = useState<"semanal" | "mensal">("semanal");
+  const [vendas, setVendas] = useState<any[]>([]);
+  const [produtos, setProdutos] = useState<any[]>([]);
 
-  // Dados de exemplo - em produção viriam do estado global ou backend
-  const vendas: Venda[] = [
-    {
-      id: "1",
-      produtoId: "1",
-      produtoNome: "Dipirona 500mg",
-      quantidade: 25,
-      precoVenda: 12.90,
-      total: 322.50,
-      data: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: "2",
-      produtoId: "2",
-      produtoNome: "Ibuprofeno 600mg",
-      quantidade: 10,
-      precoVenda: 18.50,
-      total: 185.00,
-      data: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: "3",
-      produtoId: "3",
-      produtoNome: "Vitamina C 1g",
-      quantidade: 15,
-      precoVenda: 32.90,
-      total: 493.50,
-      data: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ];
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const produtos = [
-    { id: "1", nome: "Dipirona 500mg", estoque: 125 },
-    { id: "2", nome: "Ibuprofeno 600mg", estoque: 15 },
-    { id: "3", nome: "Vitamina C 1g", estoque: 65 },
-  ];
+  const fetchData = async () => {
+    try {
+      const { data: vendasData, error: vendasError } = await supabase
+        .from("vendas")
+        .select("*")
+        .order("data", { ascending: false });
 
-  const filtrarPorPeriodo = (venda: Venda) => {
-    const dataVenda = new Date(venda.data);
+      if (vendasError) throw vendasError;
+
+      const { data: produtosData, error: produtosError } = await supabase
+        .from("produtos")
+        .select("*");
+
+      if (produtosError) throw produtosError;
+
+      setVendas(vendasData || []);
+      setProdutos(produtosData || []);
+    } catch (error: any) {
+      toast.error("Erro ao carregar dados: " + error.message);
+    }
+  };
+
+  const vendasFiltradas = useMemo(() => {
     const agora = new Date();
-    const diferenca = agora.getTime() - dataVenda.getTime();
-    const dias = diferenca / (1000 * 60 * 60 * 24);
+    const limite = new Date();
 
     if (periodo === "semanal") {
-      return dias <= 7;
+      limite.setDate(agora.getDate() - 7);
     } else {
-      return dias <= 30;
+      limite.setMonth(agora.getMonth() - 1);
     }
-  };
 
-  const vendasFiltradas = vendas.filter(filtrarPorPeriodo);
+    return vendas.filter((venda) => new Date(venda.data) >= limite);
+  }, [vendas, periodo]);
 
-  const resumo = useMemo(() => {
-    const totalVendas = vendasFiltradas.reduce((acc, v) => acc + v.quantidade, 0);
-    const totalReceita = vendasFiltradas.reduce((acc, v) => acc + v.total, 0);
-    const produtosMaisVendidos = vendasFiltradas.reduce((acc, v) => {
-      const existente = acc.find((p) => p.produtoId === v.produtoId);
-      if (existente) {
-        existente.quantidade += v.quantidade;
-        existente.receita += v.total;
-      } else {
-        acc.push({
-          produtoId: v.produtoId,
-          produtoNome: v.produtoNome,
-          quantidade: v.quantidade,
-          receita: v.total,
-        });
+  const totalVendas = vendasFiltradas.reduce(
+    (acc, venda) => acc + venda.total,
+    0
+  );
+  const quantidadeVendas = vendasFiltradas.reduce(
+    (acc, venda) => acc + venda.quantidade,
+    0
+  );
+
+  const produtosAgrupados = useMemo(() => {
+    const grupos: { [key: string]: { quantidade: number; total: number } } = {};
+
+    vendasFiltradas.forEach((venda) => {
+      if (!grupos[venda.produto_nome]) {
+        grupos[venda.produto_nome] = { quantidade: 0, total: 0 };
       }
-      return acc;
-    }, [] as { produtoId: string; produtoNome: string; quantidade: number; receita: number }[]);
-
-    produtosMaisVendidos.sort((a, b) => b.quantidade - a.quantidade);
-
-    return {
-      totalVendas,
-      totalReceita,
-      produtosMaisVendidos: produtosMaisVendidos.slice(0, 5),
-    };
-  }, [vendasFiltradas]);
-
-  // Dados para gráfico de linha (vendas ao longo do tempo)
-  const dadosVendasTempo = useMemo(() => {
-    const vendasPorData = vendasFiltradas.reduce((acc, v) => {
-      const data = new Date(v.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-      const existente = acc.find((item) => item.data === data);
-      if (existente) {
-        existente.vendas += v.quantidade;
-        existente.receita += v.total;
-      } else {
-        acc.push({ data, vendas: v.quantidade, receita: v.total });
-      }
-      return acc;
-    }, [] as { data: string; vendas: number; receita: number }[]);
-
-    return vendasPorData.sort((a, b) => {
-      const [diaA, mesA] = a.data.split('/').map(Number);
-      const [diaB, mesB] = b.data.split('/').map(Number);
-      return mesA === mesB ? diaA - diaB : mesA - mesB;
+      grupos[venda.produto_nome].quantidade += venda.quantidade;
+      grupos[venda.produto_nome].total += venda.total;
     });
+
+    return Object.entries(grupos).map(([nome, dados]) => ({
+      nome,
+      quantidade: dados.quantidade,
+      total: dados.total,
+    }));
   }, [vendasFiltradas]);
 
-  // Dados para gráfico de barras (produtos mais vendidos)
-  const dadosProdutos = useMemo(() => {
-    return resumo.produtosMaisVendidos.map(p => ({
-      nome: p.produtoNome.length > 15 ? p.produtoNome.substring(0, 15) + '...' : p.produtoNome,
-      quantidade: p.quantidade,
-      receita: p.receita,
+  const dadosGraficoLinha = useMemo(() => {
+    const dados: { [key: string]: number } = {};
+
+    vendasFiltradas.forEach((venda) => {
+      const data = new Date(venda.data).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+      });
+      dados[data] = (dados[data] || 0) + venda.total;
+    });
+
+    return Object.entries(dados)
+      .map(([data, valor]) => ({ data, valor }))
+      .slice(-7);
+  }, [vendasFiltradas]);
+
+  const dadosGraficoPizza = useMemo(() => {
+    return produtosAgrupados.slice(0, 5).map((produto) => ({
+      name: produto.nome,
+      value: produto.total,
     }));
-  }, [resumo.produtosMaisVendidos]);
+  }, [produtosAgrupados]);
 
-  // Cores para os gráficos
-  const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', 'hsl(var(--accent))'];
+  const handleExportar = (formato: "pdf" | "csv") => {
+    const dadosVendas = vendasFiltradas.map((venda) => ({
+      id: venda.id,
+      produtoId: venda.produto_id,
+      produtoNome: venda.produto_nome,
+      quantidade: venda.quantidade,
+      precoVenda: venda.preco_unitario,
+      total: venda.total,
+      data: venda.data,
+    }));
 
-  const handleExportarPDF = async () => {
-    try {
-      await exportToPDF(
-        vendasFiltradas,
-        produtos,
+    const dadosProdutos = produtos.map((produto) => ({
+      id: produto.id,
+      nome: produto.nome,
+      estoque: produto.estoque,
+    }));
+
+    if (formato === "pdf") {
+      exportToPDF(
+        dadosVendas,
+        dadosProdutos,
         periodo,
-        resumo.totalVendas,
-        resumo.totalReceita,
-        logoUrl
+        quantidadeVendas,
+        totalVendas,
+        marjocLogo
       );
       toast.success("Relatório PDF exportado com sucesso!");
-    } catch (error) {
-      toast.error("Erro ao exportar relatório PDF");
-      console.error(error);
-    }
-  };
-
-  const handleExportarCSV = () => {
-    try {
+    } else {
       exportToCSV(
-        vendasFiltradas,
-        produtos,
+        dadosVendas,
+        dadosProdutos,
         periodo,
-        resumo.totalVendas,
-        resumo.totalReceita
+        quantidadeVendas,
+        totalVendas
       );
       toast.success("Relatório CSV exportado com sucesso!");
-    } catch (error) {
-      toast.error("Erro ao exportar relatório CSV");
-      console.error(error);
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Relatórios</h2>
           <p className="text-sm text-muted-foreground">
-            Visualize vendas e estoque por período
+            Análise de vendas e estoque
           </p>
         </div>
 
-        <div className="flex gap-2">
-          <Select value={periodo} onValueChange={(value: "semanal" | "mensal") => setPeriodo(value)}>
+        <div className="flex gap-3">
+          <Select
+            value={periodo}
+            onValueChange={(value: "semanal" | "mensal") => setPeriodo(value)}
+          >
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -222,6 +202,7 @@ const Relatorios = () => {
               <SelectItem value="mensal">Mensal</SelectItem>
             </SelectContent>
           </Select>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2">
@@ -230,10 +211,12 @@ const Relatorios = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={handleExportarPDF}>
+              <DropdownMenuItem onClick={() => handleExportar("pdf")}>
+                <FileText className="mr-2 h-4 w-4" />
                 Exportar como PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportarCSV}>
+              <DropdownMenuItem onClick={() => handleExportar("csv")}>
+                <FileText className="mr-2 h-4 w-4" />
                 Exportar como CSV
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -241,196 +224,146 @@ const Relatorios = () => {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2">
         <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="rounded-full bg-primary/10 p-3">
-              <FileText className="h-6 w-6 text-primary" />
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">
+                Total de Vendas
+              </p>
+              <p className="text-3xl font-bold text-foreground">
+                Akz {totalVendas.toFixed(2)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Período: {periodo === "semanal" ? "Últimos 7 dias" : "Último mês"}
+              </p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total de Vendas</p>
-              <p className="text-2xl font-bold">{resumo.totalVendas}</p>
-              <p className="text-xs text-muted-foreground">unidades vendidas</p>
+            <div className="rounded-full bg-secondary p-3 text-primary">
+              <TrendingUp className="h-5 w-5" />
             </div>
           </div>
         </Card>
 
         <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="rounded-full bg-success/10 p-3">
-              <TrendingUp className="h-6 w-6 text-success" />
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">
+                Produtos Vendidos
+              </p>
+              <p className="text-3xl font-bold text-foreground">
+                {quantidadeVendas}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Unidades no período
+              </p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Receita Total</p>
-              <p className="text-2xl font-bold">Akz {resumo.totalReceita.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground">no período</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="rounded-full bg-warning/10 p-3">
-              <Package className="h-6 w-6 text-warning" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Produtos em Estoque</p>
-              <p className="text-2xl font-bold">{produtos.reduce((acc, p) => acc + p.estoque, 0)}</p>
-              <p className="text-xs text-muted-foreground">unidades totais</p>
+            <div className="rounded-full bg-secondary p-3 text-primary">
+              <Package className="h-5 w-5" />
             </div>
           </div>
         </Card>
       </div>
 
       {vendasFiltradas.length > 0 && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card className="p-6">
-            <h3 className="mb-4 text-lg font-semibold">Evolução de Vendas</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={dadosVendasTempo}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis 
-                  dataKey="data" 
-                  stroke="hsl(var(--muted-foreground))"
-                  style={{ fontSize: '12px' }}
-                />
-                <YAxis 
-                  stroke="hsl(var(--muted-foreground))"
-                  style={{ fontSize: '12px' }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="vendas" 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={2}
-                  name="Quantidade"
-                  dot={{ fill: 'hsl(var(--primary))' }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="receita" 
-                  stroke="hsl(var(--success))" 
-                  strokeWidth={2}
-                  name="Receita (Akz)"
-                  dot={{ fill: 'hsl(var(--success))' }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </Card>
+        <>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card className="p-6">
+              <h3 className="mb-4 text-lg font-semibold text-foreground">
+                Vendas ao Longo do Tempo
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={dadosGraficoLinha}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="data" />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value: number) => `Akz ${value.toFixed(2)}`}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="valor"
+                    stroke="#14b8a6"
+                    strokeWidth={2}
+                    name="Valor (Akz)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </Card>
+
+            <Card className="p-6">
+              <h3 className="mb-4 text-lg font-semibold text-foreground">
+                Top 5 Produtos Vendidos
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={dadosGraficoPizza}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={(entry) => entry.name}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {dadosGraficoPizza.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number) => `Akz ${value.toFixed(2)}`}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </Card>
+          </div>
 
           <Card className="p-6">
-            <h3 className="mb-4 text-lg font-semibold">Produtos Mais Vendidos</h3>
+            <h3 className="mb-4 text-lg font-semibold text-foreground">
+              Produtos Mais Vendidos
+            </h3>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={dadosProdutos}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis 
-                  dataKey="nome" 
-                  stroke="hsl(var(--muted-foreground))"
-                  style={{ fontSize: '11px' }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis 
-                  stroke="hsl(var(--muted-foreground))"
-                  style={{ fontSize: '12px' }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
+              <BarChart data={produtosAgrupados.slice(0, 10)}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="nome" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value: number) => value.toString()}
                 />
                 <Legend />
-                <Bar 
-                  dataKey="quantidade" 
-                  fill="hsl(var(--primary))"
-                  name="Quantidade"
-                  radius={[8, 8, 0, 0]}
-                />
+                <Bar dataKey="quantidade" fill="#14b8a6" name="Quantidade" />
               </BarChart>
             </ResponsiveContainer>
           </Card>
-        </div>
+        </>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="p-6">
-          <h3 className="mb-4 text-lg font-semibold">Top 5 Produtos</h3>
-          <div className="space-y-3">
-            {resumo.produtosMaisVendidos.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Nenhuma venda registrada no período
-              </p>
-            ) : (
-              resumo.produtosMaisVendidos.map((produto, index) => (
-                <div key={produto.produtoId} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary" className="w-8 h-8 rounded-full flex items-center justify-center">
-                      {index + 1}
-                    </Badge>
-                    <div>
-                      <p className="font-medium">{produto.produtoNome}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {produto.quantidade} unidades vendidas
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="mb-4 text-lg font-semibold">Estoque Atual</h3>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Produto</TableHead>
-                  <TableHead className="text-right">Quantidade</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {produtos.map((produto) => (
-                  <TableRow key={produto.id}>
-                    <TableCell className="font-medium">{produto.nome}</TableCell>
-                    <TableCell className="text-right">{produto.estoque}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
-      </div>
-
       <Card className="p-6">
-        <h3 className="mb-4 text-lg font-semibold">Histórico de Vendas</h3>
-        <div className="overflow-x-auto">
+        <h3 className="mb-4 text-lg font-semibold text-foreground">
+          Detalhes das Vendas
+        </h3>
+        <div className="rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
                 <TableHead>Produto</TableHead>
                 <TableHead>Quantidade</TableHead>
-                <TableHead>Preço Unit.</TableHead>
+                <TableHead>Valor Unitário</TableHead>
                 <TableHead className="text-right">Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {vendasFiltradas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={5}
+                    className="text-center text-muted-foreground"
+                  >
                     Nenhuma venda registrada no período
                   </TableCell>
                 </TableRow>
@@ -438,13 +371,62 @@ const Relatorios = () => {
                 vendasFiltradas.map((venda) => (
                   <TableRow key={venda.id}>
                     <TableCell>
-                      {new Date(venda.data).toLocaleDateString('pt-BR')}
+                      {new Date(venda.data).toLocaleDateString("pt-BR")}
                     </TableCell>
-                    <TableCell className="font-medium">{venda.produtoNome}</TableCell>
-                    <TableCell>{venda.quantidade}</TableCell>
-                    <TableCell>Akz {venda.precoVenda.toFixed(2)}</TableCell>
+                    <TableCell className="font-medium">
+                      {venda.produto_nome}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{venda.quantidade}</Badge>
+                    </TableCell>
+                    <TableCell>Akz {venda.preco_unitario.toFixed(2)}</TableCell>
                     <TableCell className="text-right font-medium">
                       Akz {venda.total.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <h3 className="mb-4 text-lg font-semibold text-foreground">
+          Estoque Atual
+        </h3>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Produto</TableHead>
+                <TableHead>Categoria</TableHead>
+                <TableHead>Quantidade</TableHead>
+                <TableHead>Valor Unitário</TableHead>
+                <TableHead className="text-right">Valor Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {produtos.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center text-muted-foreground"
+                  >
+                    Nenhum produto cadastrado
+                  </TableCell>
+                </TableRow>
+              ) : (
+                produtos.map((produto) => (
+                  <TableRow key={produto.id}>
+                    <TableCell className="font-medium">{produto.nome}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{produto.categoria}</Badge>
+                    </TableCell>
+                    <TableCell>{produto.estoque}</TableCell>
+                    <TableCell>Akz {produto.preco_venda.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      Akz {(produto.preco_venda * produto.estoque).toFixed(2)}
                     </TableCell>
                   </TableRow>
                 ))

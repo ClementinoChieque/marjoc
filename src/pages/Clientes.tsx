@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -21,6 +21,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Cliente {
   id: string;
@@ -32,27 +34,12 @@ interface Cliente {
 }
 
 const Clientes = () => {
-  const [clientes, setClientes] = useState<Cliente[]>([
-    {
-      id: "1",
-      nome: "Maria Silva Santos",
-      telefone: "(11) 98765-4321",
-      endereco: "Rua das Flores, 123 - São Paulo, SP",
-      documento: "123.456.789-00",
-      observacoes: "Cliente preferencial"
-    },
-    {
-      id: "2",
-      nome: "João Pedro Oliveira",
-      telefone: "(11) 91234-5678",
-      endereco: "Av. Paulista, 1000 - São Paulo, SP",
-      documento: "987.654.321-00",
-    }
-  ]);
-  
+  const { user } = useAuth();
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     nome: "",
     telefone: "",
@@ -61,44 +48,105 @@ const Clientes = () => {
     observacoes: "",
   });
 
-  const filteredClientes = clientes.filter((cliente) =>
-    cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.telefone.includes(searchTerm) ||
-    cliente.documento.includes(searchTerm)
+  useEffect(() => {
+    fetchClientes();
+  }, []);
+
+  const fetchClientes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setClientes(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao carregar clientes: " + error.message);
+    }
+  };
+
+  const filteredClientes = clientes.filter(
+    (cliente) =>
+      cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.telefone.includes(searchTerm) ||
+      cliente.documento.includes(searchTerm)
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (editingCliente) {
-      setClientes(clientes.map((c) =>
-        c.id === editingCliente.id ? { ...formData, id: c.id } : c
-      ));
-      toast.success("Cliente atualizado com sucesso!");
-    } else {
-      const novoCliente = {
-        ...formData,
-        id: Date.now().toString(),
-      };
-      setClientes([...clientes, novoCliente]);
-      toast.success("Cliente cadastrado com sucesso!");
+    setLoading(true);
+
+    try {
+      if (editingCliente) {
+        const { error } = await supabase
+          .from("clientes")
+          .update({
+            nome: formData.nome,
+            telefone: formData.telefone,
+            endereco: formData.endereco,
+            documento: formData.documento,
+            observacoes: formData.observacoes,
+          })
+          .eq("id", editingCliente.id);
+
+        if (error) throw error;
+        toast.success("Cliente atualizado com sucesso!");
+      } else {
+        const { error } = await supabase
+          .from("clientes")
+          .insert([
+            {
+              nome: formData.nome,
+              telefone: formData.telefone,
+              endereco: formData.endereco,
+              documento: formData.documento,
+              observacoes: formData.observacoes,
+              user_id: user?.id,
+            },
+          ]);
+
+        if (error) throw error;
+        toast.success("Cliente cadastrado com sucesso!");
+      }
+
+      await fetchClientes();
+      resetForm();
+      setIsDialogOpen(false);
+    } catch (error: any) {
+      toast.error("Erro: " + error.message);
+    } finally {
+      setLoading(false);
     }
-    
-    resetForm();
   };
 
   const handleEdit = (cliente: Cliente) => {
     setEditingCliente(cliente);
     setFormData({
-      ...cliente,
+      nome: cliente.nome,
+      telefone: cliente.telefone,
+      endereco: cliente.endereco,
+      documento: cliente.documento,
       observacoes: cliente.observacoes || "",
     });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setClientes(clientes.filter((c) => c.id !== id));
-    toast.success("Cliente excluído com sucesso!");
+  const handleDelete = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este cliente?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("clientes")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      toast.success("Cliente excluído com sucesso!");
+      await fetchClientes();
+    } catch (error: any) {
+      toast.error("Erro ao excluir: " + error.message);
+    }
   };
 
   const resetForm = () => {
@@ -110,19 +158,18 @@ const Clientes = () => {
       observacoes: "",
     });
     setEditingCliente(null);
-    setIsDialogOpen(false);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Gestão de Clientes</h2>
+          <h2 className="text-2xl font-bold text-foreground">Clientes</h2>
           <p className="text-sm text-muted-foreground">
-            Gerencie todos os clientes da farmácia
+            Gerencie os clientes da farmácia
           </p>
         </div>
-        
+
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open);
           if (!open) resetForm();
@@ -133,75 +180,86 @@ const Clientes = () => {
               Novo Cliente
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>
                 {editingCliente ? "Editar Cliente" : "Novo Cliente"}
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="nome">Nome Completo *</Label>
-                  <Input
-                    id="nome"
-                    required
-                    value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                    placeholder="Nome completo do cliente"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="telefone">Telefone *</Label>
-                  <Input
-                    id="telefone"
-                    required
-                    value={formData.telefone}
-                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                    placeholder="(00) 00000-0000"
-                  />
-                </div>
-              </div>
-              
               <div className="space-y-2">
-                <Label htmlFor="endereco">Endereço Completo *</Label>
+                <Label htmlFor="nome">Nome Completo</Label>
                 <Input
-                  id="endereco"
+                  id="nome"
+                  value={formData.nome}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nome: e.target.value })
+                  }
                   required
-                  value={formData.endereco}
-                  onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
-                  placeholder="Rua, número, bairro, cidade, estado"
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="documento">Documento (CPF) *</Label>
+                <Label htmlFor="telefone">Telefone</Label>
+                <Input
+                  id="telefone"
+                  value={formData.telefone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, telefone: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="documento">CPF/CNPJ</Label>
                 <Input
                   id="documento"
-                  required
                   value={formData.documento}
-                  onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
-                  placeholder="000.000.000-00"
+                  onChange={(e) =>
+                    setFormData({ ...formData, documento: e.target.value })
+                  }
+                  required
                 />
               </div>
-              
+
+              <div className="space-y-2">
+                <Label htmlFor="endereco">Endereço</Label>
+                <Input
+                  id="endereco"
+                  value={formData.endereco}
+                  onChange={(e) =>
+                    setFormData({ ...formData, endereco: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="observacoes">Observações</Label>
                 <Textarea
                   id="observacoes"
                   value={formData.observacoes}
-                  onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-                  placeholder="Informações adicionais sobre o cliente"
+                  onChange={(e) =>
+                    setFormData({ ...formData, observacoes: e.target.value })
+                  }
                   rows={3}
                 />
               </div>
-              
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={resetForm}>
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsDialogOpen(false);
+                    resetForm();
+                  }}
+                >
                   Cancelar
                 </Button>
-                <Button type="submit">
-                  {editingCliente ? "Atualizar" : "Cadastrar"}
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Salvando..." : "Salvar"}
                 </Button>
               </div>
             </form>
@@ -210,19 +268,17 @@ const Clientes = () => {
       </div>
 
       <Card className="p-6">
-        <div className="mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, telefone ou documento..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+        <div className="mb-4 flex items-center gap-2">
+          <Search className="h-5 w-5 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome, telefone ou documento..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-sm"
+          />
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -246,7 +302,7 @@ const Clientes = () => {
                     <TableCell className="font-medium">{cliente.nome}</TableCell>
                     <TableCell>{cliente.telefone}</TableCell>
                     <TableCell>{cliente.documento}</TableCell>
-                    <TableCell className="max-w-xs truncate">{cliente.endereco}</TableCell>
+                    <TableCell>{cliente.endereco}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -38,28 +38,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-interface Produto {
-  id: string;
-  nome: string;
-  categoria: string;
-  precoCompra: number;
-  precoVenda: number;
-  estoque: number;
-  estoqueMinimo: number;
-  validade: string;
-  codigo: string;
-}
-
-interface Venda {
-  id: string;
-  produtoId: string;
-  produtoNome: string;
-  quantidade: number;
-  precoVenda: number;
-  total: number;
-  data: string;
-}
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const categorias = [
   "Analgésico",
@@ -74,181 +54,196 @@ const categorias = [
 ];
 
 const Produtos = () => {
-  const [produtos, setProdutos] = useState<Produto[]>([
-    {
-      id: "1",
-      nome: "Dipirona 500mg",
-      categoria: "Analgésico",
-      precoCompra: 5.50,
-      precoVenda: 12.90,
-      estoque: 150,
-      estoqueMinimo: 50,
-      validade: "2025-12-31",
-      codigo: "7891234567890"
-    },
-    {
-      id: "2",
-      nome: "Ibuprofeno 600mg",
-      categoria: "Anti-inflamatório",
-      precoCompra: 8.20,
-      precoVenda: 18.50,
-      estoque: 25,
-      estoqueMinimo: 30,
-      validade: "2025-08-15",
-      codigo: "7891234567891"
-    },
-    {
-      id: "3",
-      nome: "Vitamina C 1g",
-      categoria: "Vitaminas",
-      precoCompra: 15.00,
-      precoVenda: 32.90,
-      estoque: 80,
-      estoqueMinimo: 40,
-      validade: "2026-03-20",
-      codigo: "7891234567892"
-    }
-  ]);
-  
-  const [vendas, setVendas] = useState<Venda[]>([]);
+  const { user } = useAuth();
+  const [produtos, setProdutos] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
-  const [vendaProduto, setVendaProduto] = useState<Produto | null>(null);
-  const [quantidadeVenda, setQuantidadeVenda] = useState("");
+  const [editingProduto, setEditingProduto] = useState<any | null>(null);
+  const [vendaProduto, setVendaProduto] = useState<any | null>(null);
+  const [quantidadeVenda, setQuantidadeVenda] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     nome: "",
     categoria: "",
-    precoCompra: "",
-    precoVenda: "",
+    preco_custo: "",
+    preco_venda: "",
     estoque: "",
-    estoqueMinimo: "",
     validade: "",
-    codigo: "",
   });
 
-  const filteredProdutos = produtos.filter((produto) =>
-    produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    produto.categoria.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    produto.codigo.includes(searchTerm)
-  );
+  useEffect(() => {
+    fetchProdutos();
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const produtoData = {
-      nome: formData.nome,
-      categoria: formData.categoria,
-      precoCompra: parseFloat(formData.precoCompra),
-      precoVenda: parseFloat(formData.precoVenda),
-      estoque: parseInt(formData.estoque),
-      estoqueMinimo: parseInt(formData.estoqueMinimo),
-      validade: formData.validade,
-      codigo: formData.codigo,
-    };
-    
-    if (editingProduto) {
-      setProdutos(produtos.map((p) =>
-        p.id === editingProduto.id ? { ...produtoData, id: p.id } : p
-      ));
-      toast.success("Produto atualizado com sucesso!");
-    } else {
-      const novoProduto = {
-        ...produtoData,
-        id: Date.now().toString(),
-      };
-      setProdutos([...produtos, novoProduto]);
-      toast.success("Produto cadastrado com sucesso!");
+  const fetchProdutos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("produtos")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setProdutos(data || []);
+    } catch (error: any) {
+      toast.error("Erro ao carregar produtos: " + error.message);
     }
-    
-    resetForm();
   };
 
-  const handleEdit = (produto: Produto) => {
+  const filteredProdutos = produtos.filter(
+    (produto) =>
+      produto.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      produto.categoria.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (editingProduto) {
+        const { error } = await supabase
+          .from("produtos")
+          .update({
+            nome: formData.nome,
+            categoria: formData.categoria,
+            preco_custo: parseFloat(formData.preco_custo),
+            preco_venda: parseFloat(formData.preco_venda),
+            estoque: parseInt(formData.estoque),
+            validade: formData.validade || null,
+          })
+          .eq("id", editingProduto.id);
+
+        if (error) throw error;
+        toast.success("Produto atualizado com sucesso!");
+      } else {
+        const { error } = await supabase
+          .from("produtos")
+          .insert([
+            {
+              nome: formData.nome,
+              categoria: formData.categoria,
+              preco_custo: parseFloat(formData.preco_custo),
+              preco_venda: parseFloat(formData.preco_venda),
+              estoque: parseInt(formData.estoque),
+              validade: formData.validade || null,
+              user_id: user?.id,
+            },
+          ]);
+
+        if (error) throw error;
+        toast.success("Produto cadastrado com sucesso!");
+      }
+
+      await fetchProdutos();
+      resetForm();
+      setIsDialogOpen(false);
+    } catch (error: any) {
+      toast.error("Erro: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (produto: any) => {
     setEditingProduto(produto);
     setFormData({
       nome: produto.nome,
       categoria: produto.categoria,
-      precoCompra: produto.precoCompra.toString(),
-      precoVenda: produto.precoVenda.toString(),
+      preco_custo: produto.preco_custo.toString(),
+      preco_venda: produto.preco_venda.toString(),
       estoque: produto.estoque.toString(),
-      estoqueMinimo: produto.estoqueMinimo.toString(),
-      validade: produto.validade,
-      codigo: produto.codigo,
+      validade: produto.validade || "",
     });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setProdutos(produtos.filter((p) => p.id !== id));
-    toast.success("Produto excluído com sucesso!");
+  const handleDelete = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este produto?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("produtos")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      toast.success("Produto excluído com sucesso!");
+      await fetchProdutos();
+    } catch (error: any) {
+      toast.error("Erro ao excluir: " + error.message);
+    }
+  };
+
+  const handleVender = async () => {
+    if (!vendaProduto || quantidadeVenda <= 0) return;
+
+    if (quantidadeVenda > vendaProduto.estoque) {
+      toast.error("Quantidade indisponível em estoque!");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const total = vendaProduto.preco_venda * quantidadeVenda;
+
+      // Registrar venda
+      const { error: vendaError } = await supabase
+        .from("vendas")
+        .insert([
+          {
+            produto_id: vendaProduto.id,
+            produto_nome: vendaProduto.nome,
+            quantidade: quantidadeVenda,
+            preco_unitario: vendaProduto.preco_venda,
+            total: total,
+            user_id: user?.id,
+          },
+        ]);
+
+      if (vendaError) throw vendaError;
+
+      // Atualizar estoque
+      const { error: estoqueError } = await supabase
+        .from("produtos")
+        .update({ estoque: vendaProduto.estoque - quantidadeVenda })
+        .eq("id", vendaProduto.id);
+
+      if (estoqueError) throw estoqueError;
+
+      toast.success(`Venda registrada! Total: Akz ${total.toFixed(2)}`);
+      setVendaProduto(null);
+      setQuantidadeVenda(1);
+      await fetchProdutos();
+    } catch (error: any) {
+      toast.error("Erro ao registrar venda: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetForm = () => {
     setFormData({
       nome: "",
       categoria: "",
-      precoCompra: "",
-      precoVenda: "",
+      preco_custo: "",
+      preco_venda: "",
       estoque: "",
-      estoqueMinimo: "",
       validade: "",
-      codigo: "",
     });
     setEditingProduto(null);
-    setIsDialogOpen(false);
-  };
-
-  const isEstoqueBaixo = (produto: Produto) => produto.estoque <= produto.estoqueMinimo;
-
-  const handleVender = () => {
-    if (!vendaProduto || !quantidadeVenda) return;
-    
-    const quantidade = parseInt(quantidadeVenda);
-    
-    if (quantidade <= 0) {
-      toast.error("Quantidade inválida!");
-      return;
-    }
-    
-    if (quantidade > vendaProduto.estoque) {
-      toast.error("Estoque insuficiente!");
-      return;
-    }
-    
-    // Atualizar estoque do produto
-    setProdutos(produtos.map((p) =>
-      p.id === vendaProduto.id ? { ...p, estoque: p.estoque - quantidade } : p
-    ));
-    
-    // Registrar venda
-    const novaVenda: Venda = {
-      id: Date.now().toString(),
-      produtoId: vendaProduto.id,
-      produtoNome: vendaProduto.nome,
-      quantidade,
-      precoVenda: vendaProduto.precoVenda,
-      total: vendaProduto.precoVenda * quantidade,
-      data: new Date().toISOString(),
-    };
-    
-    setVendas([...vendas, novaVenda]);
-    
-    toast.success(`Venda de ${quantidade} unidade(s) registrada com sucesso!`);
-    setVendaProduto(null);
-    setQuantidadeVenda("");
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Gestão de Produtos</h2>
+          <h2 className="text-2xl font-bold text-foreground">Produtos</h2>
           <p className="text-sm text-muted-foreground">
-            Gerencie o estoque e produtos da farmácia
+            Gerencie os produtos da farmácia
           </p>
         </div>
-        
+
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open);
           if (!open) resetForm();
@@ -259,126 +254,115 @@ const Produtos = () => {
               Novo Produto
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>
                 {editingProduto ? "Editar Produto" : "Novo Produto"}
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="nome">Nome do Produto *</Label>
-                  <Input
-                    id="nome"
-                    required
-                    value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                    placeholder="Ex: Dipirona 500mg"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="categoria">Categoria *</Label>
-                  <Select
-                    value={formData.categoria}
-                    onValueChange={(value) => setFormData({ ...formData, categoria: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categorias.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="nome">Nome do Produto</Label>
+                <Input
+                  id="nome"
+                  value={formData.nome}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nome: e.target.value })
+                  }
+                  required
+                />
               </div>
-              
-              <div className="grid gap-4 sm:grid-cols-2">
+
+              <div className="space-y-2">
+                <Label htmlFor="categoria">Categoria</Label>
+                <Select
+                  value={formData.categoria}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, categoria: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categorias.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="precoCompra">Preço de Compra (Akz) *</Label>
+                  <Label htmlFor="preco_custo">Preço de Custo (Akz)</Label>
                   <Input
-                    id="precoCompra"
+                    id="preco_custo"
                     type="number"
                     step="0.01"
+                    value={formData.preco_custo}
+                    onChange={(e) =>
+                      setFormData({ ...formData, preco_custo: e.target.value })
+                    }
                     required
-                    value={formData.precoCompra}
-                    onChange={(e) => setFormData({ ...formData, precoCompra: e.target.value })}
-                    placeholder="0.00"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="precoVenda">Preço de Venda (Akz) *</Label>
+                  <Label htmlFor="preco_venda">Preço de Venda (Akz)</Label>
                   <Input
-                    id="precoVenda"
+                    id="preco_venda"
                     type="number"
                     step="0.01"
+                    value={formData.preco_venda}
+                    onChange={(e) =>
+                      setFormData({ ...formData, preco_venda: e.target.value })
+                    }
                     required
-                    value={formData.precoVenda}
-                    onChange={(e) => setFormData({ ...formData, precoVenda: e.target.value })}
-                    placeholder="0.00"
                   />
                 </div>
               </div>
-              
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="estoque">Quantidade em Estoque *</Label>
-                  <Input
-                    id="estoque"
-                    type="number"
-                    required
-                    value={formData.estoque}
-                    onChange={(e) => setFormData({ ...formData, estoque: e.target.value })}
-                    placeholder="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="estoqueMinimo">Estoque Mínimo *</Label>
-                  <Input
-                    id="estoqueMinimo"
-                    type="number"
-                    required
-                    value={formData.estoqueMinimo}
-                    onChange={(e) => setFormData({ ...formData, estoqueMinimo: e.target.value })}
-                    placeholder="0"
-                  />
-                </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="estoque">Quantidade em Estoque</Label>
+                <Input
+                  id="estoque"
+                  type="number"
+                  value={formData.estoque}
+                  onChange={(e) =>
+                    setFormData({ ...formData, estoque: e.target.value })
+                  }
+                  required
+                />
               </div>
-              
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="validade">Data de Validade *</Label>
-                  <Input
-                    id="validade"
-                    type="date"
-                    required
-                    value={formData.validade}
-                    onChange={(e) => setFormData({ ...formData, validade: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="codigo">Código/Código de Barras *</Label>
-                  <Input
-                    id="codigo"
-                    required
-                    value={formData.codigo}
-                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                    placeholder="7891234567890"
-                  />
-                </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="validade">Data de Validade</Label>
+                <Input
+                  id="validade"
+                  type="date"
+                  value={formData.validade}
+                  onChange={(e) =>
+                    setFormData({ ...formData, validade: e.target.value })
+                  }
+                />
               </div>
-              
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={resetForm}>
+
+              <div className="flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsDialogOpen(false);
+                    resetForm();
+                  }}
+                >
                   Cancelar
                 </Button>
-                <Button type="submit">
-                  {editingProduto ? "Atualizar" : "Cadastrar"}
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Salvando..." : "Salvar"}
                 </Button>
               </div>
             </form>
@@ -387,23 +371,21 @@ const Produtos = () => {
       </div>
 
       <Card className="p-6">
-        <div className="mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, categoria ou código..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+        <div className="mb-4 flex items-center gap-2">
+          <Search className="h-5 w-5 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome ou categoria..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-sm"
+          />
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Produto</TableHead>
+                <TableHead>Nome</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead>Preço Venda</TableHead>
                 <TableHead>Estoque</TableHead>
@@ -425,27 +407,31 @@ const Produtos = () => {
                     <TableCell>
                       <Badge variant="outline">{produto.categoria}</Badge>
                     </TableCell>
-                    <TableCell>Akz {produto.precoVenda.toFixed(2)}</TableCell>
+                    <TableCell>Akz {produto.preco_venda.toFixed(2)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span>{produto.estoque}</span>
-                        {isEstoqueBaixo(produto) && (
+                        {produto.estoque < 30 && (
                           <AlertTriangle className="h-4 w-4 text-warning" />
                         )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      {new Date(produto.validade).toLocaleDateString('pt-BR')}
+                      {produto.validade
+                        ? new Date(produto.validade).toLocaleDateString("pt-BR")
+                        : "-"}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setVendaProduto(produto)}
-                          title="Vender"
+                          onClick={() => {
+                            setVendaProduto(produto);
+                            setQuantidadeVenda(1);
+                          }}
                         >
-                          <ShoppingCart className="h-4 w-4 text-primary" />
+                          <ShoppingCart className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -476,39 +462,35 @@ const Produtos = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Registrar Venda</AlertDialogTitle>
             <AlertDialogDescription>
-              Produto: <strong>{vendaProduto?.nome}</strong>
-              <br />
-              Estoque disponível: <strong>{vendaProduto?.estoque}</strong> unidades
-              <br />
-              Preço unitário: <strong>Akz {vendaProduto?.precoVenda.toFixed(2)}</strong>
+              {vendaProduto && (
+                <div className="space-y-4">
+                  <p className="font-medium">Produto: {vendaProduto.nome}</p>
+                  <p>Preço: Akz {vendaProduto.preco_venda.toFixed(2)}</p>
+                  <p>Disponível: {vendaProduto.estoque} unidades</p>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="quantidade">Quantidade</Label>
+                    <Input
+                      id="quantidade"
+                      type="number"
+                      min="1"
+                      max={vendaProduto.estoque}
+                      value={quantidadeVenda}
+                      onChange={(e) => setQuantidadeVenda(parseInt(e.target.value) || 1)}
+                    />
+                  </div>
+                  
+                  <p className="text-lg font-bold">
+                    Total: Akz {(vendaProduto.preco_venda * quantidadeVenda).toFixed(2)}
+                  </p>
+                </div>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-2 py-4">
-            <Label htmlFor="quantidadeVenda">Quantidade a vender *</Label>
-            <Input
-              id="quantidadeVenda"
-              type="number"
-              min="1"
-              max={vendaProduto?.estoque}
-              value={quantidadeVenda}
-              onChange={(e) => setQuantidadeVenda(e.target.value)}
-              placeholder="Informe a quantidade"
-            />
-            {quantidadeVenda && vendaProduto && (
-              <p className="text-sm text-muted-foreground">
-                Total: <strong>Akz {(parseFloat(quantidadeVenda) * vendaProduto.precoVenda).toFixed(2)}</strong>
-              </p>
-            )}
-          </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setVendaProduto(null);
-              setQuantidadeVenda("");
-            }}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleVender}>
-              Confirmar Venda
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleVender} disabled={loading}>
+              {loading ? "Processando..." : "Confirmar Venda"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

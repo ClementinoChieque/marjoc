@@ -7,10 +7,13 @@ import {
   Package, 
   Menu,
   X,
-  FileText
+  FileText,
+  LogOut
 } from "lucide-react";
 import marjocLogo from "@/assets/marjoc-logo.jpg";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -42,6 +45,16 @@ const menuItems = [
 export function Layout({ children }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const location = useLocation();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast.success("Logout realizado com sucesso!");
+    } catch (error: any) {
+      toast.error("Erro ao fazer logout: " + error.message);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -84,10 +97,15 @@ export function Layout({ children }: LayoutProps) {
           </nav>
 
           {/* Footer */}
-          <div className="border-t border-sidebar-border px-6 py-4">
-            <p className="text-xs text-sidebar-foreground/60">
-              Sistema de Gestão Farmacêutica
-            </p>
+          <div className="border-t border-sidebar-border px-3 py-4">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 text-sidebar-foreground/80 hover:bg-sidebar-accent/50"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-5 w-5" />
+              Sair
+            </Button>
           </div>
         </div>
       </aside>
