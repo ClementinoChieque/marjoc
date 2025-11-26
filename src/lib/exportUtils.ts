@@ -27,9 +27,9 @@ export const exportToPDF = async (
 ) => {
   const doc = new jsPDF();
   
-  // Adicionar logotipo no canto superior direito
+  // Adicionar logotipo no lado esquerdo
   try {
-    doc.addImage(logoUrl, 'PNG', 160, 10, 30, 30);
+    doc.addImage(logoUrl, 'JPEG', 10, 10, 30, 30);
   } catch (error) {
     console.error('Erro ao adicionar logo:', error);
   }
@@ -37,16 +37,16 @@ export const exportToPDF = async (
   // Cabeçalho
   doc.setFontSize(20);
   doc.setTextColor(20, 184, 166); // Cor primária teal
-  doc.text('Marjoc Lda', 20, 20);
+  doc.text('Marjoc Lda', 45, 20);
   
   doc.setFontSize(16);
   doc.setTextColor(0, 0, 0);
-  doc.text('Relatório de Vendas e Estoque', 20, 35);
+  doc.text('Relatório de Vendas e Estoque', 45, 35);
   
   doc.setFontSize(12);
   doc.setTextColor(100, 100, 100);
-  doc.text(`Período: ${periodo === 'semanal' ? 'Semanal' : 'Mensal'}`, 20, 45);
-  doc.text(`Data de emissão: ${new Date().toLocaleDateString('pt-BR')}`, 20, 52);
+  doc.text(`Período: ${periodo === 'semanal' ? 'Semanal' : 'Mensal'}`, 45, 45);
+  doc.text(`Data de emissão: ${new Date().toLocaleDateString('pt-BR')}`, 45, 52);
 
   // Resumo
   doc.setFontSize(14);

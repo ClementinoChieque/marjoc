@@ -7,9 +7,9 @@ import {
   Package, 
   Menu,
   X,
-  Activity,
   FileText
 } from "lucide-react";
+import marjocLogo from "@/assets/marjoc-logo.jpg";
 import { Button } from "@/components/ui/button";
 
 interface LayoutProps {
@@ -54,8 +54,8 @@ export function Layout({ children }: LayoutProps) {
       >
         <div className="flex h-full w-64 flex-col bg-sidebar">
           {/* Logo */}
-          <div className="flex items-center gap-2 border-b border-sidebar-border px-6 py-5">
-            <Activity className="h-7 w-7 text-sidebar-primary" />
+          <div className="flex items-center gap-3 border-b border-sidebar-border px-6 py-5">
+            <img src={marjocLogo} alt="Marjoc Logo" className="h-10 w-10 rounded-full object-cover" />
             <span className="text-xl font-bold text-sidebar-foreground">Marjoc</span>
           </div>
 
