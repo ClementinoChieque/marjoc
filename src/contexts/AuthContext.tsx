@@ -65,22 +65,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signIn = async (username: string, password: string) => {
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("username", username)
-      .single();
-
-    if (!profiles) {
-      throw new Error("Usuário não encontrado");
-    }
-
     const { error } = await supabase.auth.signInWithPassword({
       email: `${username}@marjoc.local`,
       password,
     });
 
-    if (error) throw error;
+    if (error) {
+      if (error.message.includes("Invalid login credentials")) {
+        throw new Error("Username ou senha incorretos");
+      }
+      throw error;
+    }
+    
     navigate("/");
   };
 
