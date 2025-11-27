@@ -8,7 +8,8 @@ import {
   Menu,
   X,
   FileText,
-  LogOut
+  LogOut,
+  UserPlus
 } from "lucide-react";
 import marjocLogo from "@/assets/marjoc-logo.jpg";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ const menuItems = [
 export function Layout({ children }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, isAdmin, userRole } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -78,6 +79,12 @@ export function Layout({ children }: LayoutProps) {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
               
+              // Controle de acesso: Operador de Caixa só vê Dashboard e Produtos
+              if (userRole === 'operador_caixa' && 
+                  (item.path === '/clientes' || item.path === '/relatorios')) {
+                return null;
+              }
+              
               return (
                 <Link
                   key={item.path}
@@ -94,6 +101,22 @@ export function Layout({ children }: LayoutProps) {
                 </Link>
               );
             })}
+            
+            {/* Link para criar usuário - apenas para admin */}
+            {isAdmin && (
+              <Link
+                to="/registro"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  location.pathname === '/registro'
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                )}
+              >
+                <UserPlus className="h-5 w-5" />
+                Criar Usuário
+              </Link>
+            )}
           </nav>
 
           {/* Footer */}
