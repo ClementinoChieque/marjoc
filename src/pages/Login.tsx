@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,17 @@ const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [isFirst, setIsFirst] = useState(false);
+  const { signIn, isFirstUser } = useAuth();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const checkFirstUser = async () => {
+      const first = await isFirstUser();
+      setIsFirst(first);
+    };
+    checkFirstUser();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +87,7 @@ const Login = () => {
           <p className="text-center text-sm text-muted-foreground">
             
             <Link to="/registro" className="text-primary hover:underline">
-              Criar Conta
+              Criar conta
             </Link>
           </p>
         </form>
