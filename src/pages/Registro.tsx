@@ -111,7 +111,7 @@ const Registro = () => {
               {isFirst ? "Criar Conta de Administrador" : "Criar Novo Usuário"}
             </h1>
             <p className="text-sm text-muted-foreground">
-              {isFirst ? "Primeiro usuário do sistema" : "Sistema de Gestão Farmacêutica"}
+              {isFirst ? : "Sistema de Gestão Farmacêutica"}
             </p>
           </div>
         </div>
