@@ -87,7 +87,7 @@ const Login = () => {
           <p className="text-center text-sm text-muted-foreground">
             
             <Link to="/registro" className="text-primary hover:underline">
-              Criar conta
+              Criar Conta
             </Link>
           </p>
         </form>
