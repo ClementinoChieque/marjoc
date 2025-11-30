@@ -139,18 +139,6 @@ const Dashboard = () => {
           </div>
         </Card>
 
-        <Card className="p-6">
-          <h3 className="mb-4 text-lg font-semibold text-foreground">
-            Informação do Sistema
-          </h3>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p>Sistema de Gestão Farmacêutica Marjoc</p>
-            <p>Gerencie clientes, produtos e vendas de forma eficiente</p>
-            <p className="mt-4 font-medium text-foreground">
-              Use o menu lateral para navegar entre as seções
-            </p>
-          </div>
-        </Card>
       </div>
     </div>
   );
