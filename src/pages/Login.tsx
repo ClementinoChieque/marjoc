@@ -43,7 +43,6 @@ const Login = () => {
           <img src={marjocLogo} alt="Marjoc Logo" className="h-20 w-20 rounded-full object-cover" />
           <div className="text-center">
             <h1 className="text-3xl font-bold text-foreground">Marjoc</h1>
-            <p className="text-sm text-muted-foreground">Sistema de Gestão Farmacêutica</p>
           </div>
         </div>
 
@@ -77,7 +76,7 @@ const Login = () => {
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
-            Primeiro acesso?{" "}
+            
             <Link to="/registro" className="text-primary hover:underline">
               Criar conta
             </Link>
