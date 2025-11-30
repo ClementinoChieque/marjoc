@@ -81,9 +81,7 @@ const Dashboard = () => {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground">Dashboard</h2>
-        <p className="text-sm text-muted-foreground">
-          Visão geral do sistema Marjoc
-        </p>
+        
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
